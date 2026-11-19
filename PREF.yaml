@@ -1,0 +1,79 @@
+location:
+  base_city: "Vacaville, CA"
+  allow_california_remote: true
+  allowed_work_modes:
+    - "remote"
+    - "hybrid"
+    - "on-site"
+  # Used if you filter on-site/hybrid distances from Vacaville (e.g., Solano, Yolo, Sacramento, East Bay, Napa)
+  preferred_regions:
+    - "Vacaville"
+    - "Fairfield"
+    - "Davis"
+    - "Sacramento"
+    - "Napa"
+    - "Vallejo"
+    - "Concord"
+    - "Walnut Creek"
+    - "California"
+    - "Remote"
+
+compensation:
+  currency: "USD"
+  min_annual_salary: 65000     # Convert hourly * 2080 in filter logic (~$31.25/hr)
+  keep_undisclosed_salary: true
+  undisclosed_requires_high_fit: true
+
+target_roles:
+  primary_titles:
+    - "Healthcare Operations Coordinator"
+    - "Clinic Operations Coordinator"
+    - "Practice Operations Specialist"
+    - "Patient Access Coordinator"
+    - "Referral Coordinator"
+    - "Care Coordination Specialist"
+    - "CalAIM Coordinator"
+    - "Medi-Cal Program Coordinator"
+    - "Healthcare Data Analyst"
+    - "Operations Analyst"
+    - "Quality and Compliance Analyst"
+    - "Healthcare HR Coordinator"
+    - "Onboarding Coordinator"
+    - "Program Coordinator"
+    - "Administrative Operations Specialist"
+
+keyword_weights:
+  high_signal:
+    - "HIPAA"
+    - "PHI"
+    - "CalAIM"
+    - "Medi-Cal"
+    - "EHR"
+    - "clinic"
+    - "healthcare"
+    - "hospital"
+    - "FQHC"
+    - "community health"
+    - "referral"
+    - "care coordination"
+    - "compliance"
+    - "quality"
+    - "Salesforce"
+    - "Excel"
+    - "SQL"
+    - "onboarding"
+    - "training"
+
+hard_dealbreakers:
+  title_or_desc_excludes:
+    - "RN"
+    - "Registered Nurse"
+    - "LVN"
+    - "Licensed Vocational Nurse"
+    - "NP"
+    - "Nurse Practitioner"
+    - "MD"
+    - "DO"
+    - "Physician"
+    - "commission only"
+    - "door to door"
