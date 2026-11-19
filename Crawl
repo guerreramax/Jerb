@@ -1,0 +1,350 @@
+import hashlib
+import json
+import re
+from html.parser import HTMLParser
+from pathlib import Path
+import requests
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT / "data"
+DATA_DIR.mkdir(exist_ok=True)
+SEEN_PATH = DATA_DIR / "seen_jobs.json"
+MATCHES_PATH = DATA_DIR / "latest_matches.json"
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; JobSearchBot/1.0; +https://github.com/guerreramax/Jerb)"
+}
+
+
+class LinkAndTextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[tuple[str, str]] = []
+        self._current_href: str | None = None
+        self._buf: list[str] = []
+        self._all_text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() == "a":
+            attr_map = dict(attrs)
+            self._current_href = attr_map.get("href")
+            self._buf = []
+
+    def handle_data(self, data: str) -> None:
+        text = data.strip()
+        if text:
+            self._all_text.append(text)
+            if self._current_href is not None:
+                self._buf.append(text)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "a" and self._current_href is not None:
+            label = " ".join(self._buf).strip()
+            if label:
+                self.links.append((label, self._current_href))
+            self._current_href = None
+            self._buf = []
+
+
+def load_yaml(rel_path: str) -> dict:
+    path = ROOT / rel_path
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def load_seen() -> set:
+    if not SEEN_PATH.exists():
+        return set()
+    with open(SEEN_PATH, "r", encoding="utf-8") as f:
+        return set(json.load(f))
+
+
+def save_seen(seen: set) -> None:
+    with open(SEEN_PATH, "w", encoding="utf-8") as f:
+        json.dump(sorted(seen), f, indent=2)
+
+
+def make_dedupe_hash(title: str, company: str, location: str) -> str:
+    norm = f"{title.strip().lower()}|{company.strip().lower()}|{location.strip().lower()}"
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:16]
+
+
+def parse_annual_pay_from_text(text: str) -> tuple[float | None, float | None, bool]:
+    if not text:
+        return None, None, False
+
+    hourly_matches = re.findall(
+        r"\$\s*(\d{2,3}(?:\.\d{1,2})?)\s*(?:-|to)?\s*\$?\s*(\d{2,3}(?:\.\d{1,2})?)?\s*(?:/\s*hr|per\s*hour|hourly)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if hourly_matches:
+        low_s, high_s = hourly_matches[0]
+        low = float(low_s) * 2080
+        high = float(high_s) * 2080 if high_s else low
+        return low, high, True
+
+    annual_matches = re.findall(
+        r"\$\s*(\d{2,3}(?:,\d{3})*(?:\.\d+)?)\s*k?\s*(?:-|to)?\s*\$?\s*(\d{2,3}(?:,\d{3})*(?:\.\d+)?)?\s*k?",
+        text,
+        flags=re.IGNORECASE,
+    )
+    for low_s, high_s in annual_matches:
+        low_val = float(low_s.replace(",", ""))
+        if low_val < 500:
+            low_val *= 1000
+        if low_val >= 25000:
+            high_val = low_val
+            if high_s:
+                h = float(high_s.replace(",", ""))
+                high_val = h * 1000 if h < 500 else h
+            return low_val, high_val, True
+
+    return None, None, False
+
+
+def fetch_greenhouse(board_token: str, source_name: str) -> list[dict]:
+    url = f"https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true"
+    resp = requests.get(url, headers=HEADERS, timeout=20)
+    resp.raise_for_status()
+    jobs = []
+    for item in resp.json().get("jobs", []):
+        title = (item.get("title") or "").strip()
+        loc = ((item.get("location") or {}).get("name") or "").strip()
+        job_url = (item.get("absolute_url") or "").strip()
+        content = re.sub(r"<[^>]+>", " ", item.get("content") or "")
+        min_pay, max_pay, disclosed = parse_annual_pay_from_text(f"{title} {content}")
+        jobs.append(
+            {
+                "source": source_name,
+                "title": title,
+                "company": source_name,
+                "location": loc,
+                "url": job_url,
+                "min_annual": min_pay,
+                "max_annual": max_pay,
+                "pay_disclosed": disclosed,
+                "description": content,
+            }
+        )
+    return jobs
+
+
+def fetch_lever(site: str, source_name: str) -> list[dict]:
+    url = f"https://api.lever.co/v0/postings/{site}?mode=json"
+    resp = requests.get(url, headers=HEADERS, timeout=20)
+    resp.raise_for_status()
+    jobs = []
+    for item in resp.json():
+        title = (item.get("text") or "").strip()
+        cats = item.get("categories") or {}
+        loc = (cats.get("location") or "").strip()
+        job_url = (item.get("hostedUrl") or "").strip()
+        desc_plain = (item.get("descriptionPlain") or "").strip()
+        min_pay, max_pay, disclosed = parse_annual_pay_from_text(f"{title} {desc_plain}")
+        jobs.append(
+            {
+                "source": source_name,
+                "title": title,
+                "company": source_name,
+                "location": loc,
+                "url": job_url,
+                "min_annual": min_pay,
+                "max_annual": max_pay,
+                "pay_disclosed": disclosed,
+                "description": desc_plain,
+            }
+        )
+    return jobs
+
+
+def fetch_career_page_candidates(page_cfg: dict) -> list[dict]:
+    """
+    Fetches a company career page and extracts role-like links/text.
+    Many large hospital/ATS portals render jobs via JS widgets, so treat this
+    as a lightweight check and pair with ATS endpoints where available.
+    """
+    url = page_cfg.get("url", "")
+    name = page_cfg.get("name", "Career Page")
+    if not url:
+        return []
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=20)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"[warn] Could not fetch {name} ({url}): {exc}")
+        return []
+
+    parser = LinkAndTextExtractor()
+    parser.feed(resp.text)
+    role_hints = (
+        "coordinator",
+        "specialist",
+        "analyst",
+        "operations",
+        "compliance",
+        "quality",
+        "access",
+        "referral",
+        "program",
+        "administrator",
+        "hr",
+    )
+    candidates = []
+    for label, href in parser.links:
+        low_label = label.lower()
+        if any(h in low_label for h in role_hints) and 12 <= len(label) <= 110:
+            full_url = requests.compat.urljoin(url, href)
+            min_pay, max_pay, disclosed = parse_annual_pay_from_text(label)
+            candidates.append(
+                {
+                    "source": f"CareerPage:{name}",
+                    "title": label,
+                    "company": name,
+                    "location": "See posting",
+                    "url": full_url,
+                    "min_annual": min_pay,
+                    "max_annual": max_pay,
+                    "pay_disclosed": disclosed,
+                    "description": label,
+                }
+            )
+    return candidates
+
+
+def collect_jobs(sources: dict) -> list[dict]:
+    all_jobs: list[dict] = []
+    for board in sources.get("ats_boards", []):
+        if not board.get("enabled"):
+            continue
+        provider = (board.get("provider") or "").lower()
+        name = board.get("name", provider)
+        try:
+            if provider == "greenhouse" and board.get("board_token"):
+                all_jobs.extend(fetch_greenhouse(board["board_token"], name))
+            elif provider == "lever" and board.get("site"):
+                all_jobs.extend(fetch_lever(board["site"], name))
+        except requests.RequestException as exc:
+            print(f"[warn] ATS fetch failed for {name}: {exc}")
+
+    for page in sources.get("career_pages", []):
+        if page.get("enabled"):
+            all_jobs.extend(fetch_career_page_candidates(page))
+
+    if not all_jobs:
+        print("No live ATS/career jobs returned yet; running filter on sample jobs.")
+        all_jobs = [
+            {
+                "source": "Sample",
+                "title": "Healthcare Operations & Compliance Coordinator",
+                "company": "Bay Area Community Health",
+                "location": "Vacaville, CA",
+                "url": "https://example.org/jobs/1",
+                "min_annual": 72000,
+                "max_annual": 84000,
+                "pay_disclosed": True,
+                "description": "HIPAA compliance, clinic referral workflows, Salesforce tracking, and quality reporting.",
+            },
+            {
+                "source": "Sample",
+                "title": "Patient Access & Referral Specialist",
+                "company": "North Valley Clinic",
+                "location": "Fairfield, CA",
+                "url": "https://example.org/jobs/2",
+                "min_annual": 34 * 2080,
+                "max_annual": 39 * 2080,
+                "pay_disclosed": True,
+                "description": "Care transitions, EHR scheduling, Medi-Cal/CalAIM support, and intake assessments.",
+            },
+        ]
+
+    return all_jobs
+
+
+def score_and_filter(jobs: list[dict], prefs: dict, seen: set) -> list[dict]:
+    comp = prefs.get("compensation", {})
+    min_salary = float(comp.get("min_annual_salary", 65000))
+    keep_undisclosed = bool(comp.get("keep_undisclosed_salary", True))
+
+    keywords = [k.lower() for k in prefs.get("keyword_weights", {}).get("high_signal", [])]
+    excludes = [e.lower() for e in prefs.get("hard_dealbreakers", {}).get("title_or_desc_excludes", [])]
+
+    passed = []
+    for job in jobs:
+        title = job.get("title", "")
+        company = job.get("company", "")
+        location = job.get("location", "")
+        text_blob = f"{title} {company} {location} {job.get('description', '')}".lower()
+
+        dedupe_id = make_dedupe_hash(title, company, location)
+        if dedupe_id in seen or (job.get("url") and job["url"] in seen):
+            continue
+
+        if any(term in text_blob for term in excludes):
+            continue
+
+        min_pay = job.get("min_annual")
+        max_pay = job.get("max_annual")
+        disclosed = bool(job.get("pay_disclosed"))
+
+        if disclosed and max_pay is not None and max_pay < min_salary:
+            continue
+
+        matched_kw = sorted({kw for kw in keywords if re.search(rf"\b{re.escape(kw)}\b", text_blob)})
+        score = len(matched_kw)
+
+        if not disclosed and not keep_undisclosed:
+            continue
+        if not disclosed and score < 2:
+            continue
+
+        seen.add(dedupe_id)
+        if job.get("url"):
+            seen.add(job["url"])
+
+        passed.append(
+            {
+                "id": dedupe_id,
+                "source": job.get("source"),
+                "title": title,
+                "company": company,
+                "location": location,
+                "url": job.get("url"),
+                "pay_disclosed": disclosed,
+                "est_annual_min": round(min_pay) if min_pay else None,
+                "est_annual_max": round(max_pay) if max_pay else None,
+                "fit_score": score,
+                "matched_keywords": matched_kw,
+            }
+        )
+
+    passed.sort(key=lambda x: (x["fit_score"], x["est_annual_min"] or 0), reverse=True)
+    return passed
+
+
+def main() -> None:
+    prefs = load_yaml("config/preferences.yaml")
+    sources = load_yaml("config/sources.yaml")
+    seen = load_seen()
+    raw_jobs = collect_jobs(sources)
+    matches = score_and_filter(raw_jobs, prefs, seen)
+
+    with open(MATCHES_PATH, "w", encoding="utf-8") as f:
+        json.dump(matches, f, indent=2)
+    save_seen(seen)
+
+    print(f"Fetched {len(raw_jobs)} raw jobs -> {len(matches)} new matching jobs saved to {MATCHES_PATH}")
+    for m in matches[:10]:
+        pay_str = (
+            f"${m['est_annual_min']:,}–${m['est_annual_max']:,}/yr"
+            if m["pay_disclosed"] and m["est_annual_min"]
+            else "Pay unlisted"
+        )
+        print(f"[{m['fit_score']}] {m['title']} | {m['company']} | {m['location']} | {pay_str}")
+
+
+if __name__ == "__main__":
+    main()
