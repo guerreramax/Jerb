@@ -1,0 +1,21 @@
+job-search-os/
+├── .github/workflows/
+│   └── crawl_and_match.yml       # Scheduled cron + manual trigger
+├── config/
+│   ├── preferences.yaml          # Salary floor, Vacaville/CA/remote radius, work mode, dealbreakers
+│   ├── target_roles.yaml         # Healthcare admin tracks + keyword clusters
+│   └── sources.yaml              # Job boards + healthcare/health-tech career pages
+├── resume/
+│   ├── master_resume.md          # Grounded in Max_Guerrera_Resume PDF.pdf (factual source)
+│   └── tailored/                 # Generated tailored summaries/bullets per job_id
+├── src/
+│   ├── crawlers/
+│   │   ├── boards.py             # Reliable job boards / feeds / APIs
+│   │   └── careers.py            # Health systems, clinics, nonprofits, health-tech career pages
+│   ├── normalize_and_filter.py   # Deduplicate, normalize pay, apply hard & soft filters
+│   ├── matcher_and_resume.py     # Score healthcare-admin fit + tailor resume on top matches
+│   ├── alerts.py                 # Send digest/alerts (Discord/Slack/Email)
+│   └── tracker_sync.py           # Read/write pipeline status in your free tracker store
+├── data/
+│   └── seen_jobs.json (or DB)    # Deduplication & state tracking
+└── requirements.txt
