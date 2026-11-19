@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jerb — Healthcare Admin Job Radar</title>
+  <style>
+    :root {
+      --bg: #f6f8fa;
+      --card: #ffffff;
+      --text: #1f2328;
+      --muted: #57606a;
+      --accent: #0969da;
+      --border: #d0d7de;
+      --tag-bg: #eef4ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+    }
+    header h1 { margin: 0 0 4px; font-size: 1.35rem; }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .container {
+      max-width: 1160px;
+      margin: 20px auto;
+      padding: 0 16px;
+    }
+    .controls {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    input, select, button {
+      font: inherit;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+    }
+    input[type="search"] { flex: 1 1 240px; }
+    button { cursor: pointer; }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .chips {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .chip {
+      font-size: 0.85rem;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--bg);
+    }
+    .chip.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .job-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .job-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .job-title { margin: 0; font-size: 1.05rem; }
+    .score {
+      background: var(--tag-bg);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .meta { color: var(--muted); font-size: 0.9rem; margin: 6px 0; }
+    .pay { font-weight: 600; font-size: 0.92rem; margin-bottom: 8px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .tag {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 0.78rem;
+    }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .actions a {
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 7px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      position: sticky;
+      top: 16px;
+    }
+    .panel h2 { margin: 0 0 8px; font-size: 1.05rem; }
+    textarea {
+      width: 100%;
+      min-height: 190px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Jerb — Healthcare Admin &amp; Ops Job Radar</h1>
+    <p>Target: $30+/hr ($62,400+/yr) • Sacramento / Bay Area, Orange County, Los Angeles &amp; CA-Remote</p>
+  </header>
+
+  <div class="container">
+    <div class="controls">
+      <input id="searchInput" type="search" placeholder="Search title, org, location, HIPAA, provider..." />
+      <select id="payFilter">
+        <option value="all">All pay shown</option>
+        <option value="62400">$30+/hr ($62.4k+/yr)</option>
+        <option value="75000">~$36+/hr ($75k+/yr)</option>
+      </select>
+      <div class="chips" id="regionChips">
+        <button class="chip active" data-region="all">All Regions</button>
+        <button class="chip" data-region="sac_bay">Sac &amp; Bay Area</button>
+        <button class="chip" data-region="oc">Orange County</button>
+        <button class="chip" data-region="la">Los Angeles</button>
+        <button class="chip" data-region="remote">Remote / Hybrid</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <main id="jobList"></main>
+      <aside class="panel">
+        <h2>Notebook Chat Prompt Builder</h2>
+        <p style="margin:0;color:var(--muted);font-size:0.86rem;">
+          Select a role to generate a comparison &amp; resume-tailoring prompt for your NotebookLM chat.
+        </p>
+        <textarea id="promptBox" readonly></textarea>
+        <button class="primary" id="copyPromptBtn" style="width:100%;">Copy Prompt</button>
+        <div id="copyStatus" style="margin-top:8px;font-size:0.82rem;color:var(--muted);"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const FALLBACK_JOBS = [
+      {
+        id: "demo-1",
+        title: "Claims & Provider Relations Oversight Specialist",
+        company: "Western Health Advantage",
+        location: "Sacramento, CA",
+        url: "https://www.indeed.com",
+        pay_disclosed: true,
+        est_annual_min: 70304,
+        est_annual_max: 85000,
+        fit_score: 7,
+        matched_keywords: ["compliance", "provider", "training", "regulatory"]
+      },
+      {
+        id: "demo-2",
+        title: "Healthcare Operations & Compliance Coordinator",
+        company: "Bay Area Community Health",
+        location: "Vacaville, CA",
+        url: "https://www.indeed.com",
+        pay_disclosed: true,
+        est_annual_min: 72000,
+        est_annual_max: 84000,
+        fit_score: 8,
+        matched_keywords: ["HIPAA", "compliance", "Salesforce", "quality"]
+      }
+    ];
+
+    let allJobs = [];
+    let selectedRegion = "all";
+    let selectedJob = null;
+
+    function matchesRegion(locText, region) {
+      const l = (locText || "").toLowerCase();
+      if (region === "all") return true;
+      if (region === "sac_bay") return /sacramento|davis|roseville|folsom|vacaville|fairfield|walnut creek|bay area|san jose|palo alto|oakland|san francisco|marin|napa/.test(l);
+      if (region === "oc") return /orange|irvine|costa mesa|newport|tustin|anaheim|santa ana/.test(l);
+      if (region === "la") return /los angeles|pasadena|burbank|santa monica|culver|glendale|torrance/.test(l);
+      if (region === "remote") return /remote|hybrid/.test(l);
+      return true;
+    }
+
+    function formatPay(job) {
+      if (job.pay_disclosed && job.est_annual_min) {
+        const hi = job.est_annual_max ? `–$${Number(job.est_annual_max).toLocaleString()}` : "+";
+        return `$${Number(job.est_annual_min).toLocaleString()}${hi}/yr`;
+      }
+      return "Pay not listed in feed";
+    }
+
+    function buildPrompt(job) {
+      return [
+        "Compare this role against my resume and preferences ($30+/hr / $62.4k+ target, healthcare admin/operations/compliance/provider relations/HR/data fit, no clinical license dealbreakers, check MHA in-progress vs. required, and Sac/Bay, OC, LA, or CA-remote fit):",
+        `Title: ${job.title}`,
+        `Company: ${job.company}`,
+        `Location: ${job.location}`,
+        `Pay: ${formatPay(job)}`,
+        `Matched Keywords: ${(job.matched_keywords || []).join(", ")}`,
+        `URL: ${job.url || ""}`,
+        "Provide: 1) Fit verdict, 2) Gaps/watch-outs, 3) Tailored summary & 4 resume bullets using only facts from my resume."
+      ].join("\n");
+    }
+
+    function selectJob(job) {
+      selectedJob = job;
+      document.getElementById("promptBox").value = buildPrompt(job);
+      document.getElementById("copyStatus").textContent = "";
+    }
+
+    function render() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const minPay = Number(document.getElementById("payFilter").value || 0);
+      const listEl = document.getElementById("jobList");
+
+      const filtered = allJobs.filter(job => {
+        const blob = `${job.title} ${job.company} ${job.location} ${(job.matched_keywords || []).join(" ")}`.toLowerCase();
+        if (q && !blob.includes(q)) return false;
+        if (!matchesRegion(job.location, selectedRegion)) return false;
+        if (minPay > 0 && job.pay_disclosed && (job.est_annual_max || job.est_annual_min || 0) < minPay) {
+          return false;
+        }
+        return true;
+      });
+
+      if (!filtered.length) {
+        listEl.innerHTML = `<div class="job-card">No matching roles for these filters yet.</div>`;
+        return;
+      }
+
+      if (!selectedJob || !filtered.some(j => j.id === selectedJob.id)) {
+        selectJob(filtered[0]);
+      }
+
+      listEl.innerHTML = filtered.map((job, idx) => `
+        <article class="job-card">
+          <div class="job-top">
+            <h3 class="job-title">${job.title}</h3>
+            <span class="score">Fit ${job.fit_score ?? 0}</span>
+          </div>
+          <div class="meta">${job.company} • ${job.location}</div>
+          <div class="pay">${formatPay(job)}</div>
+          <div class="tags">
+            ${(job.matched_keywords || []).map(k => `<span class="tag">${k}</span>`).join("")}
+          </div>
+          <div class="actions">
+            <button class="primary" onclick="window.__selectByIdx(${idx})">Load in Helper</button>
+            ${job.url ? `<a href="${job.url}" target="_blank" rel="noopener noreferrer">Open Posting</a>` : ""}
+          </div>
+        </article>
+      `).join("");
+
+      window.__selectByIdx = (i) => selectJob(filtered[i]);
+    }
+
+    async function init() {
+      try {
+        const res = await fetch("./data/latest_matches.json", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length) {
+            allJobs = data;
+          }
+        }
+      } catch (_) {}
+      if (!allJobs.length) allJobs = FALLBACK_JOBS;
+      render();
+    }
+
+    document.getElementById("searchInput").addEventListener("input", render);
+    document.getElementById("payFilter").addEventListener("change", render);
+    document.querySelectorAll("#regionChips .chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#regionChips .chip").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedRegion = btn.dataset.region;
+        render();
+      });
+    });
+    document.getElementById("copyPromptBtn").addEventListener("click", async () => {
+      const text = document.getElementById("promptBox").value;
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      document.getElementById("copyStatus").textContent = "Copied! Paste into your NotebookLM chat.";
+    });
+
+    init();
+  </script>
+</body>
+</html>
