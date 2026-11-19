@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jerb — Healthcare Admin Job Radar</title>
+  <title>Jerb — Healthcare Admin Job Filter &amp; Radar</title>
   <style>
     :root {
       --bg: #f6f8fa;
@@ -11,8 +11,8 @@
       --text: #1f2328;
       --muted: #57606a;
       --accent: #0969da;
+      --accent-soft: #eef4ff;
       --border: #d0d7de;
-      --tag-bg: #eef4ff;
     }
     * { box-sizing: border-box; }
     body {
@@ -26,11 +26,16 @@
       background: var(--card);
       border-bottom: 1px solid var(--border);
       padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
     }
     header h1 { margin: 0 0 4px; font-size: 1.35rem; }
     header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
     .container {
-      max-width: 1160px;
+      max-width: 1220px;
       margin: 20px auto;
       padding: 0 16px;
     }
@@ -39,10 +44,16 @@
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 14px;
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: 2fr repeat(4, minmax(140px, 1fr));
       gap: 10px;
       margin-bottom: 18px;
+    }
+    @media (max-width: 980px) {
+      .controls { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .controls { grid-template-columns: 1fr; }
     }
     input, select, button {
       font: inherit;
@@ -52,7 +63,6 @@
       background: var(--card);
       color: var(--text);
     }
-    input[type="search"] { flex: 1 1 240px; }
     button { cursor: pointer; }
     button.primary {
       background: var(--accent);
@@ -60,15 +70,24 @@
       border-color: var(--accent);
       font-weight: 600;
     }
-    .chips {
-      width: 100%;
+    .subbar {
+      grid-column: 1 / -1;
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin-top: 4px;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
     }
     .chip {
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       padding: 5px 10px;
       border-radius: 999px;
       background: var(--bg);
@@ -77,6 +96,29 @@
       background: var(--accent);
       color: #fff;
       border-color: var(--accent);
+    }
+    .toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+    .toggles label {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      cursor: pointer;
+    }
+    .summary-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      gap: 10px;
+      flex-wrap: wrap;
     }
     .grid {
       display: grid;
@@ -102,7 +144,7 @@
     }
     .job-title { margin: 0; font-size: 1.05rem; }
     .score {
-      background: var(--tag-bg);
+      background: var(--accent-soft);
       color: var(--accent);
       font-weight: 700;
       font-size: 0.8rem;
@@ -119,6 +161,13 @@
       border-radius: 6px;
       padding: 2px 8px;
       font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .tag.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
     }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .actions a {
@@ -140,7 +189,7 @@
     .panel h2 { margin: 0 0 8px; font-size: 1.05rem; }
     textarea {
       width: 100%;
-      min-height: 190px;
+      min-height: 200px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.8rem;
       padding: 10px;
@@ -152,25 +201,65 @@
 </head>
 <body>
   <header>
-    <h1>Jerb — Healthcare Admin &amp; Ops Job Radar</h1>
-    <p>Target: $30+/hr ($62,400+/yr) • Sacramento / Bay Area, Orange County, Los Angeles &amp; CA-Remote</p>
+    <div>
+      <h1>Jerb — Healthcare Admin Job Filter &amp; Radar</h1>
+      <p>Floor: $30+/hr ($62,400+/yr) • Sac/Bay, Orange County, Los Angeles &amp; CA-Remote • MHA/Data/Ops</p>
+    </div>
+    <div id="statusBadge" style="font-size:0.85rem;color:var(--muted);">Loading jobs...</div>
   </header>
 
   <div class="container">
     <div class="controls">
-      <input id="searchInput" type="search" placeholder="Search title, org, location, HIPAA, provider..." />
-      <select id="payFilter">
-        <option value="all">All pay shown</option>
-        <option value="62400">$30+/hr ($62.4k+/yr)</option>
-        <option value="75000">~$36+/hr ($75k+/yr)</option>
+      <input id="searchInput" type="search" placeholder="Search title, company, location, keyword..." />
+
+      <select id="trackFilter" title="Filter by role track">
+        <option value="all">All Tracks</option>
+        <option value="ops_compliance">Operations &amp; Compliance</option>
+        <option value="provider_network">Provider Relations &amp; Network</option>
+        <option value="hr_training">HR, Training &amp; Onboarding</option>
+        <option value="data_reporting">Data, Quality &amp; Reporting</option>
       </select>
-      <div class="chips" id="regionChips">
-        <button class="chip active" data-region="all">All Regions</button>
-        <button class="chip" data-region="sac_bay">Sac &amp; Bay Area</button>
-        <button class="chip" data-region="oc">Orange County</button>
-        <button class="chip" data-region="la">Los Angeles</button>
-        <button class="chip" data-region="remote">Remote / Hybrid</button>
+
+      <select id="payFilter" title="Minimum compensation">
+        <option value="0">Any Pay</option>
+        <option value="62400" selected>$30+/hr ($62.4k+/yr)</option>
+        <option value="75000">~$36+/hr ($75k+/yr)</option>
+        <option value="85000">~$41+/hr ($85k+/yr)</option>
+      </select>
+
+      <select id="scoreFilter" title="Minimum keyword fit score">
+        <option value="0">Any Fit Score</option>
+        <option value="2">Fit 2+</option>
+        <option value="4">Fit 4+</option>
+        <option value="6">Fit 6+</option>
+      </select>
+
+      <select id="sortBy" title="Sort results">
+        <option value="fit_desc">Sort: Highest Fit</option>
+        <option value="pay_desc">Sort: Highest Pay</option>
+        <option value="title_asc">Sort: Title A–Z</option>
+      </select>
+
+      <div class="subbar">
+        <div class="chips" id="regionChips">
+          <button class="chip active" data-region="all">All Regions</button>
+          <button class="chip" data-region="sac_bay">Sac &amp; Bay Area</button>
+          <button class="chip" data-region="oc">Orange County</button>
+          <button class="chip" data-region="la">Los Angeles</button>
+          <button class="chip" data-region="remote">Remote / Hybrid</button>
+        </div>
+
+        <div class="toggles">
+          <label><input type="checkbox" id="includeUnlisted" checked /> Keep unlisted pay</label>
+          <label><input type="checkbox" id="hideClinical" checked /> Hide RN/LVN/NP/MD</label>
+          <button type="button" id="resetBtn" style="padding:5px 10px;font-size:0.82rem;">Reset</button>
+        </div>
       </div>
+    </div>
+
+    <div class="summary-bar">
+      <div id="resultCount">Showing 0 jobs</div>
+      <div id="activeTagNotice"></div>
     </div>
 
     <div class="grid">
@@ -178,7 +267,7 @@
       <aside class="panel">
         <h2>Notebook Chat Prompt Builder</h2>
         <p style="margin:0;color:var(--muted);font-size:0.86rem;">
-          Select a role to generate a comparison &amp; resume-tailoring prompt for your NotebookLM chat.
+          Pick any filtered job to build a tailored comparison &amp; resume prompt for your NotebookLM chat.
         </p>
         <textarea id="promptBox" readonly></textarea>
         <button class="primary" id="copyPromptBtn" style="width:100%;">Copy Prompt</button>
@@ -190,7 +279,7 @@
   <script>
     const FALLBACK_JOBS = [
       {
-        id: "demo-1",
+        id: "sample-1",
         title: "Claims & Provider Relations Oversight Specialist",
         company: "Western Health Advantage",
         location: "Sacramento, CA",
@@ -199,24 +288,62 @@
         est_annual_min: 70304,
         est_annual_max: 85000,
         fit_score: 7,
-        matched_keywords: ["compliance", "provider", "training", "regulatory"]
+        matched_keywords: ["compliance", "provider", "training", "regulatory"],
+        description: "Oversight of provider relations, compliance documentation, and staff training."
       },
       {
-        id: "demo-2",
+        id: "sample-2",
         title: "Healthcare Operations & Compliance Coordinator",
         company: "Bay Area Community Health",
-        location: "Vacaville, CA",
+        location: "Vacaville, CA (Hybrid)",
         url: "https://www.indeed.com",
         pay_disclosed: true,
         est_annual_min: 72000,
         est_annual_max: 84000,
         fit_score: 8,
-        matched_keywords: ["HIPAA", "compliance", "Salesforce", "quality"]
+        matched_keywords: ["HIPAA", "compliance", "Salesforce", "quality"],
+        description: "Clinic operations, HIPAA compliance, Salesforce tracking, and quality reporting."
+      },
+      {
+        id: "sample-3",
+        title: "Assistant Administrative Analyst - Provider Enrollment",
+        company: "UC Irvine Health",
+        location: "Orange, CA",
+        url: "https://www.indeed.com",
+        pay_disclosed: true,
+        est_annual_min: 67434,
+        est_annual_max: 118040,
+        fit_score: 6,
+        matched_keywords: ["provider", "compliance", "regulatory", "Excel"],
+        description: "Provider enrollment workflows, regulatory compliance, and administrative analysis."
+      },
+      {
+        id: "sample-4",
+        title: "People Operations & Onboarding Coordinator",
+        company: "North Bay Health Network",
+        location: "Remote, CA",
+        url: "https://www.indeed.com",
+        pay_disclosed: true,
+        est_annual_min: 77709,
+        est_annual_max: 86300,
+        fit_score: 5,
+        matched_keywords: ["onboarding", "training", "operations", "Salesforce"],
+        description: "New hire onboarding, training coordination, and HR/people operations."
       }
     ];
 
+    const TRACK_PATTERNS = {
+      ops_compliance: /operations|compliance|quality|regulatory|audit|accreditation|clinic|access|referral|care coordination|calaim|medi-cal|hipaa/,
+      provider_network: /provider|network|credential|enrollment|contracting|payer|health plan|relations/,
+      hr_training: /hr|human resources|people|onboarding|training|recruiting|talent|learning/,
+      data_reporting: /data|analyst|analytics|reporting|sql|excel|metrics|quality|kpi/
+    };
+
+    const CLINICAL_RE = /\b(rn|registered nurse|lvn|licensed vocational nurse|np|nurse practitioner|pa-c|physician assistant|md|do|physician)\b/i;
+
     let allJobs = [];
     let selectedRegion = "all";
+    let activeKeyword = "";
     let selectedJob = null;
 
     function matchesRegion(locText, region) {
@@ -229,21 +356,33 @@
       return true;
     }
 
+    function matchesTrack(job, track) {
+      if (track === "all") return true;
+      const blob = `${job.title || ""} ${job.description || ""} ${(job.matched_keywords || []).join(" ")}`.toLowerCase();
+      return (TRACK_PATTERNS[track] || /.*/).test(blob);
+    }
+
     function formatPay(job) {
       if (job.pay_disclosed && job.est_annual_min) {
-        const hi = job.est_annual_max ? `–$${Number(job.est_annual_max).toLocaleString()}` : "+";
-        return `$${Number(job.est_annual_min).toLocaleString()}${hi}/yr`;
+        const minA = Number(job.est_annual_min);
+        const maxA = job.est_annual_max ? Number(job.est_annual_max) : null;
+        const minHr = (minA / 2080).toFixed(2);
+        const maxHr = maxA ? (maxA / 2080).toFixed(2) : null;
+        const annStr = maxA ? `$${minA.toLocaleString()}–$${maxA.toLocaleString()}/yr` : `$${minA.toLocaleString()}+/yr`;
+        const hrStr = maxHr ? `~$${minHr}–$${maxHr}/hr` : `~$${minHr}+/hr`;
+        return `${annStr} (${hrStr})`;
       }
       return "Pay not listed in feed";
     }
 
     function buildPrompt(job) {
       return [
-        "Compare this role against my resume and preferences ($30+/hr / $62.4k+ target, healthcare admin/operations/compliance/provider relations/HR/data fit, no clinical license dealbreakers, check MHA in-progress vs. required, and Sac/Bay, OC, LA, or CA-remote fit):",
+        "Compare this role against my resume and preferences ($30+/hr / $62.4k+ target, healthcare admin/operations/compliance/provider relations/HR/data fit, no clinical license dealbreakers, MHA in-progress vs. required, and Sac/Bay, OC, LA, or CA-remote fit):",
         `Title: ${job.title}`,
         `Company: ${job.company}`,
         `Location: ${job.location}`,
         `Pay: ${formatPay(job)}`,
+        `Fit Score: ${job.fit_score ?? 0}`,
         `Matched Keywords: ${(job.matched_keywords || []).join(", ")}`,
         `URL: ${job.url || ""}`,
         "Provide: 1) Fit verdict, 2) Gaps/watch-outs, 3) Tailored summary & 4 resume bullets using only facts from my resume."
@@ -252,27 +391,73 @@
 
     function selectJob(job) {
       selectedJob = job;
-      document.getElementById("promptBox").value = buildPrompt(job);
+      document.getElementById("promptBox").value = job ? buildPrompt(job) : "";
       document.getElementById("copyStatus").textContent = "";
     }
 
     function render() {
       const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const track = document.getElementById("trackFilter").value;
       const minPay = Number(document.getElementById("payFilter").value || 0);
+      const minScore = Number(document.getElementById("scoreFilter").value || 0);
+      const sortBy = document.getElementById("sortBy").value;
+      const includeUnlisted = document.getElementById("includeUnlisted").checked;
+      const hideClinical = document.getElementById("hideClinical").checked;
+
       const listEl = document.getElementById("jobList");
+      const countEl = document.getElementById("resultCount");
+      const tagNoticeEl = document.getElementById("activeTagNotice");
+
+      tagNoticeEl.innerHTML = activeKeyword
+        ? `Keyword filter: <strong>${activeKeyword}</strong> <button type="button" id="clearTagBtn" style="padding:2px 8px;font-size:0.78rem;margin-left:4px;">Clear</button>`
+        : "";
+      const clearTagBtn = document.getElementById("clearTagBtn");
+      if (clearTagBtn) {
+        clearTagBtn.addEventListener("click", () => {
+          activeKeyword = "";
+          render();
+        });
+      }
 
       const filtered = allJobs.filter(job => {
-        const blob = `${job.title} ${job.company} ${job.location} ${(job.matched_keywords || []).join(" ")}`.toLowerCase();
+        const kws = (job.matched_keywords || []).map(k => String(k).toLowerCase());
+        const blob = `${job.title || ""} ${job.company || ""} ${job.location || ""} ${job.description || ""} ${kws.join(" ")}`.toLowerCase();
+
+        if (hideClinical && CLINICAL_RE.test(`${job.title || ""} ${job.description || ""}`)) return false;
         if (q && !blob.includes(q)) return false;
+        if (activeKeyword && !kws.includes(activeKeyword.toLowerCase()) && !blob.includes(activeKeyword.toLowerCase())) return false;
+        if (!matchesTrack(job, track)) return false;
         if (!matchesRegion(job.location, selectedRegion)) return false;
-        if (minPay > 0 && job.pay_disclosed && (job.est_annual_max || job.est_annual_min || 0) < minPay) {
-          return false;
+        if ((job.fit_score ?? 0) < minScore) return false;
+
+        if (minPay > 0) {
+          if (!job.pay_disclosed || !job.est_annual_min) {
+            if (!includeUnlisted) return false;
+          } else {
+            const topPay = Number(job.est_annual_max || job.est_annual_min);
+            if (topPay < minPay) return false;
+          }
         }
         return true;
       });
 
+      filtered.sort((a, b) => {
+        if (sortBy === "pay_desc") {
+          const pa = a.pay_disclosed ? Number(a.est_annual_max || a.est_annual_min || 0) : -1;
+          const pb = b.pay_disclosed ? Number(b.est_annual_max || b.est_annual_min || 0) : -1;
+          return pb - pa;
+        }
+        if (sortBy === "title_asc") {
+          return String(a.title || "").localeCompare(String(b.title || ""));
+        }
+        return (b.fit_score ?? 0) - (a.fit_score ?? 0);
+      });
+
+      countEl.textContent = `Showing ${filtered.length} of ${allJobs.length} loaded jobs`;
+
       if (!filtered.length) {
-        listEl.innerHTML = `<div class="job-card">No matching roles for these filters yet.</div>`;
+        listEl.innerHTML = `<div class="job-card">No roles match these filters. Try widening pay, region, or fit score.</div>`;
+        selectJob(null);
         return;
       }
 
@@ -289,7 +474,10 @@
           <div class="meta">${job.company} • ${job.location}</div>
           <div class="pay">${formatPay(job)}</div>
           <div class="tags">
-            ${(job.matched_keywords || []).map(k => `<span class="tag">${k}</span>`).join("")}
+            ${(job.matched_keywords || []).map(k => {
+              const isAct = activeKeyword && activeKeyword.toLowerCase() === String(k).toLowerCase();
+              return `<span class="tag ${isAct ? "active" : ""}" data-kw="${k}">${k}</span>`;
+            }).join("")}
           </div>
           <div class="actions">
             <button class="primary" onclick="window.__selectByIdx(${idx})">Load in Helper</button>
@@ -299,24 +487,39 @@
       `).join("");
 
       window.__selectByIdx = (i) => selectJob(filtered[i]);
+      listEl.querySelectorAll(".tag[data-kw]").forEach(el => {
+        el.addEventListener("click", () => {
+          const clicked = el.dataset.kw;
+          activeKeyword = activeKeyword === clicked ? "" : clicked;
+          render();
+        });
+      });
     }
 
     async function init() {
+      const badge = document.getElementById("statusBadge");
       try {
         const res = await fetch("./data/latest_matches.json", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length) {
             allJobs = data;
+            badge.textContent = `Loaded ${allJobs.length} jobs from latest_matches.json`;
           }
         }
       } catch (_) {}
-      if (!allJobs.length) allJobs = FALLBACK_JOBS;
+      if (!allJobs.length) {
+        allJobs = FALLBACK_JOBS;
+        badge.textContent = "Showing sample roles (add data/latest_matches.json for live data)";
+      }
       render();
     }
 
-    document.getElementById("searchInput").addEventListener("input", render);
-    document.getElementById("payFilter").addEventListener("change", render);
+    ["searchInput", "trackFilter", "payFilter", "scoreFilter", "sortBy", "includeUnlisted", "hideClinical"].forEach(id => {
+      document.getElementById(id).addEventListener("input", render);
+      document.getElementById(id).addEventListener("change", render);
+    });
+
     document.querySelectorAll("#regionChips .chip").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("#regionChips .chip").forEach(b => b.classList.remove("active"));
@@ -325,6 +528,22 @@
         render();
       });
     });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      document.getElementById("searchInput").value = "";
+      document.getElementById("trackFilter").value = "all";
+      document.getElementById("payFilter").value = "62400";
+      document.getElementById("scoreFilter").value = "0";
+      document.getElementById("sortBy").value = "fit_desc";
+      document.getElementById("includeUnlisted").checked = true;
+      document.getElementById("hideClinical").checked = true;
+      selectedRegion = "all";
+      activeKeyword = "";
+      document.querySelectorAll("#regionChips .chip").forEach(b => b.classList.remove("active"));
+      document.querySelector('#regionChips .chip[data-region="all"]').classList.add("active");
+      render();
+    });
+
     document.getElementById("copyPromptBtn").addEventListener("click", async () => {
       const text = document.getElementById("promptBox").value;
       if (!text) return;
