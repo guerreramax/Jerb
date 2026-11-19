@@ -1,0 +1,36 @@
+job_boards:
+  - name: "USAJOBS Healthcare & Admin"
+    type: "api_or_feed"
+    enabled: true
+    notes: "Federal/VA administrative, program, and health data roles"
+
+company_careers:
+  - name: "Sutter Health"
+    type: "career_page"
+    url: "https://www.sutterhealth.org/careers"
+    category: "regional_health_system"
+    enabled: true
+
+  - name: "Kaiser Permanente"
+    type: "career_page"
+    url: "https://www.kpiling.org/careers"
+    category: "integrated_health_system"
+    enabled: true
+
+  - name: "UC Davis Health"
+    type: "career_page"
+    url: "https://health.ucdavis.edu/hr/jobs/"
+    category: "academic_health_system"
+    enabled: true
+
+  - name: "NorthBay Health"
+    type: "career_page"
+    url: "https://www.northbay.org/careers"
+    category: "local_health_system"
+    enabled: true
+
+  - name: "La Clinica"
+    type: "career_page"
+    url: "https://www.laclinica.org/careers"
+    category: "fqhc_community_health"
+    enabled: true
