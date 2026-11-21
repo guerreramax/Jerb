@@ -38,7 +38,18 @@
       max-width: 1220px;
       margin: 20px auto;
       padding: 0 16px;
+      display: none;
     }
+    .lock-card {
+      max-width: 420px;
+      margin: 64px auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .lock-card h2 { margin: 0 0 8px; }
+    .lock-card p { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; }
     .controls {
       background: var(--card);
       border: 1px solid var(--border);
@@ -205,10 +216,18 @@
       <h1>Jerb — Healthcare Admin Job Filter &amp; Radar</h1>
       <p>Floor: $30+/hr ($62,400+/yr) • Sac/Bay, Orange County, Los Angeles &amp; CA-Remote • MHA/Data/Ops</p>
     </div>
-    <div id="statusBadge" style="font-size:0.85rem;color:var(--muted);">Loading jobs...</div>
+    <div id="statusBadge" style="font-size:0.85rem;color:var(--muted);">Locked</div>
   </header>
 
-  <div class="container">
+  <div id="lockScreen" class="lock-card">
+    <h2>Jerb Access Gate</h2>
+    <p>Enter passcode to open filters and job matches.</p>
+    <input id="passInput" type="password" placeholder="Passcode" style="width:100%;margin-bottom:10px;" />
+    <button id="unlockBtn" type="button" class="primary" style="width:100%;">Unlock</button>
+    <div id="passErr" style="color:#cf222e;font-size:0.85rem;margin-top:8px;"></div>
+  </div>
+
+  <div class="container" id="dashboard">
     <div class="controls">
       <input id="searchInput" type="search" placeholder="Search title, company, location, keyword..." />
 
@@ -277,6 +296,8 @@
   </div>
 
   <script>
+    const EXPECTED_HASH = "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a";
+
     const FALLBACK_JOBS = [
       {
         id: "sample-1",
@@ -345,6 +366,12 @@
     let selectedRegion = "all";
     let activeKeyword = "";
     let selectedJob = null;
+    let jobsLoaded = false;
+
+    async function sha256Hex(str) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
 
     function matchesRegion(locText, region) {
       const l = (locText || "").toLowerCase();
@@ -496,7 +523,9 @@
       });
     }
 
-    async function init() {
+    async function loadJobsOnce() {
+      if (jobsLoaded) return;
+      jobsLoaded = true;
       const badge = document.getElementById("statusBadge");
       try {
         const res = await fetch("./data/latest_matches.json", { cache: "no-store" });
@@ -513,6 +542,32 @@
         badge.textContent = "Showing sample roles (add data/latest_matches.json for live data)";
       }
       render();
+    }
+
+    function unlockDashboard() {
+      sessionStorage.setItem("jerb_unlocked", "1");
+      document.getElementById("lockScreen").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      loadJobsOnce();
+    }
+
+    async function tryUnlock() {
+      const val = document.getElementById("passInput").value;
+      const h = await sha256Hex(val);
+      if (h === EXPECTED_HASH) {
+        unlockDashboard();
+      } else {
+        document.getElementById("passErr").textContent = "Wrong passcode.";
+      }
+    }
+
+    document.getElementById("unlockBtn").addEventListener("click", tryUnlock);
+    document.getElementById("passInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") tryUnlock();
+    });
+
+    if (sessionStorage.getItem("jerb_unlocked") === "1") {
+      unlockDashboard();
     }
 
     ["searchInput", "trackFilter", "payFilter", "scoreFilter", "sortBy", "includeUnlisted", "hideClinical"].forEach(id => {
@@ -550,8 +605,6 @@
       await navigator.clipboard.writeText(text);
       document.getElementById("copyStatus").textContent = "Copied! Paste into your NotebookLM chat.";
     });
-
-    init();
   </script>
 </body>
 </html>
